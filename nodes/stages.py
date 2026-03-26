@@ -751,7 +751,7 @@ def run_shape_generation(
         Plus raw_mesh_vertices/faces for texture stage reconstruction
     """
     import comfy.utils
-    import cumesh as CuMesh
+    from . import rocm_mesh_ops as CuMesh
 
     _init_config()
 

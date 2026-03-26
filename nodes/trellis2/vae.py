@@ -842,7 +842,7 @@ class SparseUnetVaeDecoder(nn.Module):
 # Section 3: FlexiDualGrid VAE (from fdg_vae.py)
 # ============================================================================
 
-from o_voxel.convert import flexible_dual_grid_to_mesh
+from ..rocm_voxel_ops import flexible_dual_grid_to_mesh
 import comfy.model_management as _cmm
 
 
@@ -871,12 +871,10 @@ class Mesh:
         return self.to('cpu')
 
     def fill_holes(self, max_hole_perimeter=3e-2):
-        import cumesh
-        device = _cmm.get_torch_device()
-        vertices = self.vertices.to(device)
-        faces = self.faces.to(device)
-        mesh = cumesh.CuMesh()
-        mesh.init(vertices, faces)
+        from ..rocm_mesh_ops import CuMeshCompat
+        mesh = CuMeshCompat()
+        mesh.init(self.vertices, self.faces)
+        # CPU compat: these are no-ops, fill_holes handles everything internally
         mesh.get_edges()
         mesh.get_boundary_info()
         if mesh.num_boundaries == 0:
@@ -887,32 +885,24 @@ class Mesh:
         mesh.read_manifold_boundary_adjacency()
         mesh.get_boundary_connected_components()
         mesh.get_boundary_loops()
-        if mesh.num_boundary_loops == 0:
-            return
         mesh.fill_holes(max_hole_perimeter=max_hole_perimeter)
         new_vertices, new_faces = mesh.read()
         self.vertices = new_vertices.to(self.device)
         self.faces = new_faces.to(self.device)
 
     def remove_faces(self, face_mask: torch.Tensor):
-        import cumesh
-        device = _cmm.get_torch_device()
-        vertices = self.vertices.to(device)
-        faces = self.faces.to(device)
-        mesh = cumesh.CuMesh()
-        mesh.init(vertices, faces)
+        from ..rocm_mesh_ops import CuMeshCompat
+        mesh = CuMeshCompat()
+        mesh.init(self.vertices, self.faces)
         mesh.remove_faces(face_mask)
         new_vertices, new_faces = mesh.read()
         self.vertices = new_vertices.to(self.device)
         self.faces = new_faces.to(self.device)
 
     def simplify(self, target=1000000, verbose: bool = False, options: dict = {}):
-        import cumesh
-        device = _cmm.get_torch_device()
-        vertices = self.vertices.to(device)
-        faces = self.faces.to(device)
-        mesh = cumesh.CuMesh()
-        mesh.init(vertices, faces)
+        from ..rocm_mesh_ops import CuMeshCompat
+        mesh = CuMeshCompat()
+        mesh.init(self.vertices, self.faces)
         mesh.simplify(target, verbose=verbose, options=options)
         new_vertices, new_faces = mesh.read()
         self.vertices = new_vertices.to(self.device)
@@ -965,7 +955,7 @@ class MeshWithVoxel(Mesh, Voxel):
         )
 
     def query_attrs(self, xyz):
-        from flex_gemm.ops.grid_sample import grid_sample_3d
+        from ..rocm_grid_sample import grid_sample_3d
         grid = ((xyz - self.origin) / self.voxel_size).reshape(1, -1, 3)
         vertex_attrs = grid_sample_3d(
             self.attrs,

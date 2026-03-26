@@ -1,5 +1,7 @@
+# ROCm 7.2 port: flash-attn installed from ROCm/flash-attention or SDPA fallback.
+# sageattention removed (CUDA-only).
 [cuda]
-packages = ['flash-attn','sageattention']
+packages = []
 
 [node_reqs]
 ComfyUI-GeometryPack = "PozzettiAndrea/ComfyUI-GeometryPack"

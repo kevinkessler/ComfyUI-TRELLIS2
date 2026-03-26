@@ -1,5 +1,11 @@
+# ROCm 7.2 port: CUDA-only packages removed.
+# torch/torchvision installed from ROCm wheel index.
+# nvdiffrast installed from pip (OpenGL backend).
+# cumesh/flex_gemm/o_voxel replaced with CPU/PyTorch fallbacks in rocm_*.py.
+# flash-attn from ROCm/flash-attention or SDPA fallback.
+# sageattention/nvdiffrec_render removed (unused on ROCm).
 [cuda]
-packages = ["nvdiffrast", "flex_gemm", "cumesh", "o_voxel", "nvdiffrec_render", "torch", "torchvision", "flash-attn", "sageattention"]
+packages = []
 
 [pypi-dependencies]
 # HuggingFace models

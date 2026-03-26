@@ -22,8 +22,14 @@ wheels/
 
 # Virtual environments
 venv/
+.venv/
 ENV/
 env/
+
+# Media files
+*.mp3
+*.wav
+
 
 # IDE
 .idea/

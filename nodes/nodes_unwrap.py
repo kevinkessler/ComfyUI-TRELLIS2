@@ -57,7 +57,7 @@ Parameters:
         remesh_band=1.0,
     ):
         import torch
-        import cumesh as CuMesh
+        from . import rocm_mesh_ops as CuMesh
         import trimesh as Trimesh
 
         logger.info(f"Simplify: {len(trimesh.vertices)} vertices, {len(trimesh.faces)} faces -> {target_face_count} target")
@@ -72,7 +72,7 @@ Parameters:
         vertices_orig = vertices.clone()
         vertices_orig[:, 1], vertices_orig[:, 2] = -vertices[:, 2].clone(), vertices[:, 1].clone()
 
-        # Initialize CuMesh
+        # Initialize CuMesh compat
         cumesh = CuMesh.CuMesh()
         cumesh.init(vertices_orig, faces)
         logger.info(f"Initial: {cumesh.num_vertices} vertices, {cumesh.num_faces} faces")
@@ -82,7 +82,7 @@ Parameters:
             cumesh.fill_holes(max_hole_perimeter=fill_holes_perimeter)
             logger.info(f"After fill holes: {cumesh.num_vertices} vertices, {cumesh.num_faces} faces")
 
-        # Optional remesh
+        # Optional remesh (CPU fallback — passthrough, see rocm_mesh_ops)
         if remesh:
             curr_verts, curr_faces = cumesh.read()
             bvh = CuMesh.cuBVH(curr_verts, curr_faces)
@@ -136,7 +136,7 @@ Parameters:
 
         logger.info(f"Simplify complete: {len(result.vertices)} vertices, {len(result.faces)} faces")
 
-        # Clean up GPU memory
+        # Clean up
         del vertices, faces, vertices_orig, out_vertices, out_faces, cumesh
         gc.collect()
         comfy.model_management.soft_empty_cache()
@@ -188,7 +188,7 @@ TIP: Simplify mesh first! UV unwrapping 10M faces takes forever.
         chart_smooth_strength=1,
     ):
         import torch
-        import cumesh as CuMesh
+        from . import rocm_mesh_ops as CuMesh
         import trimesh as Trimesh
 
         logger.info(f"UV Unwrap: {len(trimesh.vertices)} vertices, {len(trimesh.faces)} faces")
@@ -205,7 +205,7 @@ TIP: Simplify mesh first! UV unwrapping 10M faces takes forever.
 
         chart_cone_angle_rad = np.radians(chart_cone_angle)
 
-        # Initialize CuMesh
+        # Initialize CuMesh compat
         cumesh = CuMesh.CuMesh()
         cumesh.init(vertices_orig, faces)
 
@@ -228,7 +228,7 @@ TIP: Simplify mesh first! UV unwrapping 10M faces takes forever.
 
         # Compute normals
         cumesh.compute_vertex_normals()
-        out_normals = cumesh.read_vertex_normals()[out_vmaps.to(device)].cpu().numpy()
+        out_normals = cumesh.read_vertex_normals()[out_vmaps].cpu().numpy()
 
         # Convert to Z-up
         out_vertices[:, 1], out_vertices[:, 2] = out_vertices[:, 2].copy(), -out_vertices[:, 1].copy()
@@ -291,9 +291,9 @@ Parameters:
     ):
         import torch
         import cv2
-        import cumesh as CuMesh
+        from . import rocm_mesh_ops as CuMesh
         import nvdiffrast.torch as dr
-        from flex_gemm.ops.grid_sample import grid_sample_3d
+        from .rocm_grid_sample import grid_sample_3d
         import trimesh as Trimesh
 
         # Check for UVs
@@ -362,7 +362,7 @@ Parameters:
         logger.info("Rasterizing in UV space...")
 
         # Setup nvdiffrast
-        ctx = dr.RasterizeCudaContext()
+        ctx = dr.RasterizeGLContext()  # ROCm: OpenGL backend instead of CUDA
 
         # Prepare UVs for rasterization
         uvs_rast = torch.cat([
@@ -546,7 +546,7 @@ Parameters:
     ):
         import json
         import torch
-        from o_voxel.postprocess import to_glb
+        from .rocm_voxel_ops import to_glb
 
         logger.info(f"ExportGLB: loading {voxelgrid_path}")
         data = np.load(voxelgrid_path, allow_pickle=True)
